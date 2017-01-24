@@ -1,0 +1,336 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Game Alpha</title>
+<link href="http://fonts.googleapis.com/css?family=Oswald:400,700" rel="stylesheet" type="text/css">
+<style>
+* {
+	padding: 0;
+	border: 0;
+	margin: 0;
+	box-sizing: border-box;
+	font-family: 'Oswald', sans-serif;
+}
+html {
+	height: 100%;
+	width: 100%;
+}
+body {
+	height: 100%;
+	width: 100%;
+	background-color: black;
+	overflow: hidden;
+}
+header {
+	height: 10%;
+	background-color: white;
+}
+#title_screen {
+	display:flex;
+	align-content:center;
+	justify-content:center;
+	flex-wrap:wrap;
+	flex-direction:row;
+	background-color: rgba(255,255,255,.5);
+	opacity:0;
+	border-radius: 20px;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	margin: -250px 0 0 -250px;
+	z-index: 100;
+	width: 500px;
+	height: 500px;
+}
+#title, #subtitle, #playButton {opacity:0;}
+#title{font-size:100px;}
+#subtitle{font-size:30px;margin-bottom:10px;}
+#playButton{background-color:red;font-size:20px;padding:10px;width:100%;height:50px;transition:all 1s;}
+#playButton:hover{background-color:blue;}
+#grid {
+	width: 100%;
+	height: 90%;
+}
+#grid div {
+	float: left;
+}
+</style>
+<script src="libraries/jquery/jquery-2.1.4.min.js"></script>
+<script src="libraries/greensock/TimelineMax.min.js"></script>
+<script src="libraries/greensock/TweenMax.min.js"></script>
+</head>
+
+<body onLoad="gridConstructor()">
+<!--<header>Snake By Sage</header>-->
+<div id="title_screen"> 
+<h1 id="title">Snake</h1>
+<h2 id="subtitle">Coded By: Sage Pacheco</h2>
+<button id="playButton" onClick="startGame()" type="button">Play Game</button>
+</div>
+<div id="grid"> </div>
+</body>
+<script type="text/javascript">
+
+// To Do List:
+// Change color behavior
+//
+//
+//
+
+// Global Variables
+var screenWidth = $('body').width();
+var screenHeight = $('body').height();
+var cubeWidth = screenWidth * .025 - 20;
+var cubeHeight = screenHeight * .05 - 20;
+var cubeCount = 800;
+var grid = [];
+var animations = [];
+var gameSpeed = 10;
+
+// Game Timeline
+var titleScreen = $('#title_screen'); 
+var title = $('#title');
+var subtitle = $('#subtitle');
+var playButton = $('#playButton');
+var tl = new TimelineMax();
+tl.add( TweenLite.to(titleScreen, 1, {opacity:1}, "intro") );
+tl.add( TweenLite.to(title, .5, {opacity:1}, "intro") );
+tl.add( TweenLite.to(subtitle, .5, {opacity:1}, "intro") );
+tl.add( TweenLite.to(playButton, .5, {opacity:1}, "intro") );
+tl.addPause("intro");
+tl.add( TweenLite.to(titleScreen, 1, {opacity:0}, "game start") );
+tl.addPause("game start");
+
+// Main Function that generates grid
+function gridConstructor(){
+	for (i = 0; i < cubeCount; i++){
+		$('#grid').append("<div class='cube' index ='" + i + "' id ='" + i + "'></div>");
+		grid[i] = new cube(cubeWidth, cubeHeight, i);
+		grid[i].render();
+	}
+}
+
+function startGame(){
+	game = true;
+	tl.play();
+	snakeFood();
+	coolSnake = new snake();
+	imListening();
+}
+
+// Defines Cube Object. Requires width, height, and index numer
+function cube(width, height, cubeNumber){
+	this.cubeID = cubeNumber;
+	this.width = width;
+	this.height = height;
+	this.color = '#000';
+	this.occupied = false;
+	this.render = function (){
+		document.getElementById(this.cubeID).style.width = this.width + 'px';
+		document.getElementById(this.cubeID).style.height = this.height + 'px';
+		document.getElementById(this.cubeID).style.backgroundColor = this.color;
+		document.getElementById(this.cubeID).style.margin = '10px';
+		document.getElementById(this.cubeID).style.borderRadius = '10px';
+	}
+	this.changeSize = function (){
+		document.getElementById(this.cubeID).style.width = this.width + 'px';
+		document.getElementById(this.cubeID).style.height = this.height + 'px';
+	}
+}
+
+// Function that animates the cube
+function animateIt(count, color){
+	var currentObject = document.getElementById(count);
+	grid[count].color = color;
+	animations[count] = TweenLite.to(currentObject, 1, {borderRadius:100, boxShadow: "inset 0 0 0 50px " + grid[count].color});
+}
+
+// Reverses animation of a particular animation object.
+function reverseIt(count){
+//	console.log("Request: " + count);
+	if (count < 800 && count >= 0){
+		animations[count].reverse();
+	} else {
+		console.log("Outside Index requested and denied: " + count);	
+	}
+}
+
+// Generates Event Listeners
+function imListening(){
+	window.addEventListener('keydown', function(){tracker(event)});
+	window.addEventListener('resize', reCalculate);
+	// Timed Interval
+	window.setInterval(function(){coolSnake.moveSnake()}, gameSpeed);
+	// console.log("Interval Set");
+}
+
+// Function that fires on browser resize. Resizes grid.
+function reCalculate(){
+	// console.log("Resize has been called");
+	var screenWidth = $('body').width();
+	var screenHeight = $('body').height();
+	var cubeWidth = screenWidth * .05 - 20;
+	var cubeHeight = screenHeight * .10 - 20;
+	for (i = 0; i < cubeCount; i++){
+		grid[i].width = cubeWidth;
+		grid[i].height = cubeHeight;
+		grid[i].render();
+	}
+}
+
+// Tracks button presses and decides what to do with it.
+function tracker(event){
+	var keyPressed = event.keyCode;
+	// console.log("keyCode: " + keyPressed);
+	switch(keyPressed){
+		case 37:
+				// console.log("Detected Left");
+				if(coolSnake.direction == "Right"){console.log("Snake Bounce blocked");}
+				else{
+				coolSnake.direction = "Left";
+				}
+			break;
+		case 38:
+				// console.log("Detected Up");
+				if(coolSnake.direction == "Down"){console.log("Snake Bounce blocked");}
+				else{
+				coolSnake.direction = "Up";
+				}
+			break;	
+		case 39:
+				// console.log("Detected Right");
+				if(coolSnake.direction == "Left"){console.log("Snake Bounce blocked");}
+				else{
+				coolSnake.direction = "Right";
+				}
+			break;
+		case 40:
+				// console.log("Detected Down");
+				if(coolSnake.direction == "Up"){console.log("Snake Bounce blocked");}
+				else{
+				coolSnake.direction = "Down";
+				}
+			break;	
+	}
+}
+
+// Produces a random color when called
+function randomColor(){
+	var color = '#'+Math.floor(Math.random()*16777215).toString(16);
+	if (color.length == 7){
+		return color;
+	} else {
+		while (color.length < 7){
+			color += "0";
+		}
+		return color;
+	}
+}
+
+// Snake Algorithms
+
+var game = true;
+var food = 0;
+
+function snakeFood(){
+	food = Math.floor(Math.random() * (cubeCount - 1));
+	
+	// Prevents new food unit from occupying snake
+	while (isCollision(food)){
+		console.log("Collision Loop Initiated")
+		food = Math.floor(Math.random() * (cubeCount - 1));
+	}
+	grid[food].occupied = true;
+	animateIt(food, randomColor());
+	return food;
+}
+
+function snake(){
+	// console.log("Cool Snake is born");
+	this.size = 1;
+	this.trailArray = [401, 400, 399];
+	this.position = 400;
+	this.direction = 'Right';
+	this.moveSnake = function (){
+		if(game){
+			switch(this.direction){
+				case "Left":
+					if (this.position != 0){
+						this.position += -1;
+						// console.log("Moving Snake Left");
+					} else {
+						this.position = cubeCount - 1;
+					}
+					break;
+				case "Up":
+					if (this.position >= 40){
+						this.position += -40;
+						// console.log("Moving Snake Up");
+					} else {
+						this.position += 760;
+					}
+					break;	
+				case "Right":
+					if (this.position != (cubeCount - 1)){
+						this.position += 1;
+						// console.log("Moving Snake Right");
+					} else {
+						this.position = 0;
+					}
+					break;
+				case "Down":
+					if (this.position < (cubeCount - 40)){
+						this.position += 40;
+						// console.log("Moving Snake Down");
+					} else {
+						this.position += -760;
+					}
+					break;	
+			}
+			// Checks for collision. Ends game if true. Occupies position if false.
+			if (!isCollision(this.position)){
+				this.trail();
+			} else {
+				console.log("Game is over");
+				game = false;
+				tl.reverse();
+			}
+		}
+	}
+	this.trail = function (){
+		// console.log("Trail at call " + this.trailArray);
+		// If food is attained. Skip Array Purge. This allows snake to grow.
+		// console.log("food = " + food + " and position = " + this.position);
+		this.trailArray.unshift(this.position);
+		if (this.position == food){
+			console.log("Food was gathered, so pop was skipped.");
+			coolSnake.size++;
+			snakeFood();
+		} else {
+			animateIt(this.position, randomColor());
+			grid[this.position].occupied = true;
+			var popped = this.trailArray.pop();
+			if (popped >= 0){
+				reverseIt(popped);
+				grid[popped].occupied = false;
+			}
+		}
+	}
+}
+
+// Detects collision event with food or self
+function isCollision(position){
+	if (position == food){
+		console.log("Food Gathered");
+		return false;
+	}
+	else if (grid[position].occupied == true){
+		console.log("Is Collision");
+		return true
+	} else {
+		return false;
+	}
+}
+</script>
+</html>
