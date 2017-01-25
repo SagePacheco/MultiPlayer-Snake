@@ -32,7 +32,7 @@ header {
 	justify-content:center;
 	flex-wrap:wrap;
 	flex-direction:row;
-	background-color: rgba(255,255,255,.5);
+	background-color: rgba(255,255,255,1);
 	opacity:0;
 	border-radius: 20px;
 	position: absolute;
@@ -50,11 +50,18 @@ header {
 #playButton:hover{background-color:blue;}
 #grid {
 	width: 100%;
-	height: 90%;
+	height: 100%;
 }
 #grid div {
 	float: left;
+	width: 2vw;
+	height: 3vh;
+	background-color: black;
+	margin: .5vh .5vw .5vh .7vw;
+	/*transition: .5s all linear;*/
+	border-radius: 100px;
 }
+
 </style>
 <script src="libraries/jquery/jquery-2.1.4.min.js"></script>
 <script src="libraries/greensock/TimelineMax.min.js"></script>
@@ -79,35 +86,33 @@ header {
 //
 
 // Global Variables
-var screenWidth = $('body').width();
-var screenHeight = $('body').height();
-var cubeWidth = screenWidth * .025 - 20;
-var cubeHeight = screenHeight * .05 - 20;
-var cubeCount = 800;
-var grid = [];
-var animations = [];
-var gameSpeed = 10;
+var grid = [],
+	cubeCount = 775,
+	gameSpeed = 80,
+	coolSnake = new Snake("blue", [250, 251, 252]),
+	antiSnake = new Snake("red", [499, 500, 501]),
+	gameClock,
+	keyListener;
 
 // Game Timeline
-var titleScreen = $('#title_screen'); 
-var title = $('#title');
-var subtitle = $('#subtitle');
-var playButton = $('#playButton');
-var tl = new TimelineMax();
-tl.add( TweenLite.to(titleScreen, 1, {opacity:1}, "intro") );
-tl.add( TweenLite.to(title, .5, {opacity:1}, "intro") );
-tl.add( TweenLite.to(subtitle, .5, {opacity:1}, "intro") );
-tl.add( TweenLite.to(playButton, .5, {opacity:1}, "intro") );
+var titleScreen = $('#title_screen'),
+	title = $('#title'),
+	subtitle = $('#subtitle'),
+	playButton = $('#playButton'),
+	tl = new TimelineMax();
+tl.add( TweenLite.to(titleScreen, .5, {opacity:1}, "intro") );
+tl.add( TweenLite.to(title, .25, {opacity:1}, "intro") );
+tl.add( TweenLite.to(subtitle, .25, {opacity:1}, "intro") );
+tl.add( TweenLite.to(playButton, .25, {opacity:1}, "intro") );
 tl.addPause("intro");
-tl.add( TweenLite.to(titleScreen, 1, {opacity:0}, "game start") );
+tl.add( TweenLite.to(titleScreen, .5, {opacity:0}, "game start") );
 tl.addPause("game start");
 
 // Main Function that generates grid
 function gridConstructor(){
-	for (i = 0; i < cubeCount; i++){
-		$('#grid').append("<div class='cube' index ='" + i + "' id ='" + i + "'></div>");
-		grid[i] = new cube(cubeWidth, cubeHeight, i);
-		grid[i].render();
+	for (i = 1; i < cubeCount; i++){
+		$('#grid').append("<div id ='" + i + "'></div>");
+		grid[i] = new Cube(i);
 	}
 }
 
@@ -115,67 +120,42 @@ function startGame(){
 	game = true;
 	tl.play();
 	snakeFood();
-	coolSnake = new snake();
-	imListening();
+	gameClock = window.setInterval(function(){
+		coolSnake.moveSnake();
+		antiSnake.moveSnake();
+	}, gameSpeed);
+	keyListener = window.addEventListener('keydown', function(){tracker(event)});
+}
+
+function resetGame(){
+	game = false;
+	tl.reverse();
+	clearInterval(gameClock);
+	grid.map(function(obj){
+		obj.occupied = false;
+		obj.reverseIt();
+	});
+	coolSnake = new Snake("blue", [250, 251, 252]);
+	antiSnake = new Snake("red", [499, 500, 501]);
+
 }
 
 // Defines Cube Object. Requires width, height, and index numer
-function cube(width, height, cubeNumber){
+function Cube(cubeNumber){
 	this.cubeID = cubeNumber;
-	this.width = width;
-	this.height = height;
 	this.color = '#000';
 	this.occupied = false;
-	this.render = function (){
-		document.getElementById(this.cubeID).style.width = this.width + 'px';
-		document.getElementById(this.cubeID).style.height = this.height + 'px';
-		document.getElementById(this.cubeID).style.backgroundColor = this.color;
-		document.getElementById(this.cubeID).style.margin = '10px';
-		document.getElementById(this.cubeID).style.borderRadius = '10px';
-	}
-	this.changeSize = function (){
-		document.getElementById(this.cubeID).style.width = this.width + 'px';
-		document.getElementById(this.cubeID).style.height = this.height + 'px';
-	}
-}
+	this.element = $('#grid #' + cubeNumber);
+	
+	// Function that animates the cube
+	this.animateIt = function (color){
+		this.element.css("background-color", color);
+		this.color = color;
+	}	
 
-// Function that animates the cube
-function animateIt(count, color){
-	var currentObject = document.getElementById(count);
-	grid[count].color = color;
-	animations[count] = TweenLite.to(currentObject, 1, {borderRadius:100, boxShadow: "inset 0 0 0 50px " + grid[count].color});
-}
-
-// Reverses animation of a particular animation object.
-function reverseIt(count){
-//	console.log("Request: " + count);
-	if (count < 800 && count >= 0){
-		animations[count].reverse();
-	} else {
-		console.log("Outside Index requested and denied: " + count);	
-	}
-}
-
-// Generates Event Listeners
-function imListening(){
-	window.addEventListener('keydown', function(){tracker(event)});
-	window.addEventListener('resize', reCalculate);
-	// Timed Interval
-	window.setInterval(function(){coolSnake.moveSnake()}, gameSpeed);
-	// console.log("Interval Set");
-}
-
-// Function that fires on browser resize. Resizes grid.
-function reCalculate(){
-	// console.log("Resize has been called");
-	var screenWidth = $('body').width();
-	var screenHeight = $('body').height();
-	var cubeWidth = screenWidth * .05 - 20;
-	var cubeHeight = screenHeight * .10 - 20;
-	for (i = 0; i < cubeCount; i++){
-		grid[i].width = cubeWidth;
-		grid[i].height = cubeHeight;
-		grid[i].render();
+	// Reverses animation of a particular animation object.
+	this.reverseIt = function (){
+		this.element.removeAttr( 'style' );
 	}
 }
 
@@ -184,6 +164,8 @@ function tracker(event){
 	var keyPressed = event.keyCode;
 	// console.log("keyCode: " + keyPressed);
 	switch(keyPressed){
+
+		// Cool Snake Moves
 		case 37:
 				// console.log("Detected Left");
 				if(coolSnake.direction == "Right"){console.log("Snake Bounce blocked");}
@@ -211,7 +193,37 @@ function tracker(event){
 				else{
 				coolSnake.direction = "Down";
 				}
+			break;
+
+		// Anti Snake Moves
+		case 65:
+				// console.log("Detected Left");
+				if(antiSnake.direction == "Right"){console.log("Snake Bounce blocked");}
+				else{
+				antiSnake.direction = "Left";
+				}
+			break;
+		case 87:
+				// console.log("Detected Up");
+				if(antiSnake.direction == "Down"){console.log("Snake Bounce blocked");}
+				else{
+				antiSnake.direction = "Up";
+				}
 			break;	
+		case 68:
+				// console.log("Detected Right");
+				if(antiSnake.direction == "Left"){console.log("Snake Bounce blocked");}
+				else{
+				antiSnake.direction = "Right";
+				}
+			break;
+		case 83:
+				// console.log("Detected Down");
+				if(antiSnake.direction == "Up"){console.log("Snake Bounce blocked");}
+				else{
+				antiSnake.direction = "Down";
+				}
+			break;		
 	}
 }
 
@@ -239,52 +251,53 @@ function snakeFood(){
 	// Prevents new food unit from occupying snake
 	while (isCollision(food)){
 		console.log("Collision Loop Initiated")
+		console.log("Changing Food");
 		food = Math.floor(Math.random() * (cubeCount - 1));
 	}
 	grid[food].occupied = true;
-	animateIt(food, randomColor());
-	return food;
+	grid[food].animateIt(randomColor());
 }
 
-function snake(){
+function Snake(color, trailArray){
 	// console.log("Cool Snake is born");
 	this.size = 1;
-	this.trailArray = [401, 400, 399];
-	this.position = 400;
+	this.color = color
+	this.trailArray = trailArray;
+	this.position = trailArray[1];
 	this.direction = 'Right';
 	this.moveSnake = function (){
 		if(game){
 			switch(this.direction){
 				case "Left":
-					if (this.position != 0){
-						this.position += -1;
+					if (this.position % 31 != 0){
+						this.position -= 1;
 						// console.log("Moving Snake Left");
 					} else {
-						this.position = cubeCount - 1;
+						this.position += 30;
 					}
 					break;
-				case "Up":
-					if (this.position >= 40){
-						this.position += -40;
-						// console.log("Moving Snake Up");
-					} else {
-						this.position += 760;
-					}
-					break;	
 				case "Right":
-					if (this.position != (cubeCount - 1)){
+					if (this.position % 31 != 0){
 						this.position += 1;
 						// console.log("Moving Snake Right");
 					} else {
-						this.position = 0;
+						this.position -= 30;
 					}
 					break;
+				case "Up":
+					if (this.position > 31){
+						this.position += -31;
+						// console.log("Moving Snake Up");
+					} else {
+						this.position += 744;
+					}
+					break;	
 				case "Down":
-					if (this.position < (cubeCount - 40)){
-						this.position += 40;
+					if (this.position < (cubeCount - 33)){
+						this.position += 31;
 						// console.log("Moving Snake Down");
 					} else {
-						this.position += -760;
+						this.position += -744;
 					}
 					break;	
 			}
@@ -293,8 +306,7 @@ function snake(){
 				this.trail();
 			} else {
 				console.log("Game is over");
-				game = false;
-				tl.reverse();
+				resetGame();
 			}
 		}
 	}
@@ -304,15 +316,16 @@ function snake(){
 		// console.log("food = " + food + " and position = " + this.position);
 		this.trailArray.unshift(this.position);
 		if (this.position == food){
-			console.log("Food was gathered, so pop was skipped.");
-			coolSnake.size++;
+			// Food gathered. Skipping pop.
+			this.size++;
+			this.color = grid[food].color;
 			snakeFood();
 		} else {
-			animateIt(this.position, randomColor());
+			grid[this.position].animateIt(this.color);
 			grid[this.position].occupied = true;
 			var popped = this.trailArray.pop();
 			if (popped >= 0){
-				reverseIt(popped);
+				grid[popped].reverseIt();
 				grid[popped].occupied = false;
 			}
 		}
