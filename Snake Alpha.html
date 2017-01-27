@@ -46,8 +46,38 @@ header {
 #title, #subtitle, #playButton {opacity:0;}
 #title{font-size:100px;}
 #subtitle{font-size:30px;margin-bottom:10px;}
-#playButton{background-color:red;font-size:20px;padding:10px;width:100%;height:50px;transition:all 1s;}
-#playButton:hover{background-color:blue;}
+#playButton{background-color:red;font-size:20px;padding:10px;width:100%;height:50px;transition:all .5s;}
+#playButton:hover{background-color:blue;color:white;}
+.playType{
+	width:33.33%;
+	height:50px;
+	background-color: black;
+	color:white;
+	transition:all .5s;
+}
+.playType:hover{background-color:blue;color:white;}
+.playType.active{
+	background-color:blue;color:white;
+}
+
+.score{}
+#playerOneScore, #playerTwoScore{
+	position: absolute;
+	top:50px;
+	font-size: 40px;
+}
+
+#playerOneScore{
+	left:45%;
+	color:blue;
+	display: none;
+}
+
+#playerTwoScore{
+	right:45%;
+	color:red;
+	display: none;
+}
 #grid {
 	width: 100%;
 	height: 100%;
@@ -58,14 +88,11 @@ header {
 	height: 3vh;
 	background-color: black;
 	margin: .5vh .5vw .5vh .7vw;
-	/*transition: .5s all linear;*/
+	transition: .1s all linear;
 	border-radius: 100px;
 }
 
 </style>
-<script src="libraries/jquery/jquery-2.1.4.min.js"></script>
-<script src="libraries/greensock/TimelineMax.min.js"></script>
-<script src="libraries/greensock/TweenMax.min.js"></script>
 </head>
 
 <body onLoad="gridConstructor()">
@@ -74,9 +101,24 @@ header {
 <h1 id="title">Snake</h1>
 <h2 id="subtitle">Coded By: Sage Pacheco</h2>
 <button id="playButton" onClick="startGame()" type="button">Play Game</button>
+<button data-game="single" class="playType">Single-Player</button>
+<button data-game="localMultiplayer" class="playType">Local Multi-Player</button>
+<button data-game="onlinePlay" class="playType active">Online Multi-Player</button>
+<input id='playerName' placeholder="Player Name" value="Sage">
 </div>
+<p id="playerOneScore" class="score">
+0
+<p>
+<p id="playerTwoScore" class="score">
+0
+</p>
 <div id="grid"> </div>
-</body>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.19.1/TimelineMax.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.19.1/TweenMax.min.js"></script>
+<script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.4.0.min.js"></script>
+
 <script type="text/javascript">
 
 // To Do List:
@@ -87,12 +129,36 @@ header {
 
 // Global Variables
 var grid = [],
+	playerOneScore = $('#playerOneScore'),
+	playerTwoScore = $('#playerTwoScore'),
+	playType = "onlinePlay", //single
 	cubeCount = 775,
-	gameSpeed = 80,
-	coolSnake = new Snake("blue", [250, 251, 252]),
-	antiSnake = new Snake("red", [499, 500, 501]),
+	gameSpeed = 80, //80
+	host = false,
+	lookingForGame = false,
+	firstRun = true,
+	myLastDirection = "Right",
+	game = true,
+	onlinePlayerName,
+	potentialHostName,
+	potentialChannel,
+	opponentName,
+	opponentChannel,
+	coolSnake,
+	antiSnake,
+	mySnake,
+	yourSnake,
 	gameClock,
-	keyListener;
+	keyListener,
+	food,
+	pubnub;
+
+// Listen for game configuration changes
+$('.playType').click(function(){
+	$('.playType').removeClass("active");
+	$(this).addClass("active");
+	playType = $(this).data("game");
+});
 
 // Game Timeline
 var titleScreen = $('#title_screen'),
@@ -100,12 +166,12 @@ var titleScreen = $('#title_screen'),
 	subtitle = $('#subtitle'),
 	playButton = $('#playButton'),
 	tl = new TimelineMax();
-tl.add( TweenLite.to(titleScreen, .5, {opacity:1}, "intro") );
+tl.add( TweenLite.to(titleScreen, .5, {opacity:1, display:'flex'}, "intro") );
 tl.add( TweenLite.to(title, .25, {opacity:1}, "intro") );
 tl.add( TweenLite.to(subtitle, .25, {opacity:1}, "intro") );
 tl.add( TweenLite.to(playButton, .25, {opacity:1}, "intro") );
 tl.addPause("intro");
-tl.add( TweenLite.to(titleScreen, .5, {opacity:0}, "game start") );
+tl.add( TweenLite.to(titleScreen, .5, {opacity:0, display:'none'}, "game start") );
 tl.addPause("game start");
 
 // Main Function that generates grid
@@ -118,13 +184,68 @@ function gridConstructor(){
 
 function startGame(){
 	game = true;
+	switch(playType){
+		case "single":
+			host = true;
+			tl.play();
+			mySnake = new Snake("Player 1", "blue", [250, 251, 252], playerOneScore);
+			snakeFood();
+			playerOneScore.css("left", "50%").css("display", "block");
+			keyListener = window.addEventListener('keydown', function(){tracker(event, coolSnake)});
+			gameClock = window.setInterval(function(){
+				mySnake.moveSnake();
+			}, gameSpeed);
+			break;
+		case "localMultiplayer":
+			host = true;
+			tl.play();
+			mySnake = new Snake("Player 1", "blue", [250, 251, 252], playerOneScore);
+			yourSnake = new Snake("Player 2", "red", [436, 437, 438], playerTwoScore);
+			snakeFood();
+			playerOneScore.css("display", "block");
+			playerTwoScore.css("display", "block");
+			keyListener = window.addEventListener('keydown', function(){tracker(event, coolSnake, antiSnake)});
+			gameClock = window.setInterval(function(){
+				mySnake.moveSnake();
+				yourSnake.moveSnake();
+			}, gameSpeed);
+			break;
+		case "onlinePlay":
+			onlinePlayerName = $('#playerName').val()
+			matchMaking();
+			break;
+	}
+}
+
+function startOnlineGame(){
+
+	playerOneScore.css("display", "block");
+	playerTwoScore.css("display", "block");
+	if(host){
+		mySnake = new Snake(onlinePlayerName, "blue", [250, 251, 252], playerOneScore);
+		yourSnake = new Snake(opponentName, "red", [436, 437, 438], playerTwoScore);
+		snakeFood();
+		keyListener = window.addEventListener('keydown', function(){tracker(event, mySnake)});
+	} else {
+		yourSnake = new Snake(opponentName, "red", [250, 251, 252], playerTwoScore);
+		mySnake = new Snake(onlinePlayerName, "blue", [436, 437, 438], playerOneScore);
+		keyListener = window.addEventListener('keydown', function(){tracker(event, yourSnake)});
+	}
 	tl.play();
-	snakeFood();
 	gameClock = window.setInterval(function(){
-		coolSnake.moveSnake();
-		antiSnake.moveSnake();
+		mySnake.moveSnake();
+		yourSnake.moveSnake();
+		if(mySnake.direction != myLastDirection){
+			myLastDirection = mySnake.direction;
+			var publishConfig = {
+		        channel : opponentChannel,
+		        message : mySnake.direction
+		    };
+	        pubnub.publish(publishConfig, function(status, response) {
+	            // console.log(status, response);
+			});
+	    }
 	}, gameSpeed);
-	keyListener = window.addEventListener('keydown', function(){tracker(event)});
 }
 
 function resetGame(){
@@ -135,12 +256,13 @@ function resetGame(){
 		obj.occupied = false;
 		obj.reverseIt();
 	});
-	coolSnake = new Snake("blue", [250, 251, 252]);
-	antiSnake = new Snake("red", [499, 500, 501]);
-
+	mySnake = undefined;
+	yourSnake = undefined;
+	playerOneScore.text(0).css("left", "45%").css("display", "none");
+	playerTwoScore.text(0).css("display", "none");
 }
 
-// Defines Cube Object. Requires width, height, and index numer
+// Defines Cube Object. Requires index numer
 function Cube(cubeNumber){
 	this.cubeID = cubeNumber;
 	this.color = '#000';
@@ -162,68 +284,69 @@ function Cube(cubeNumber){
 // Tracks button presses and decides what to do with it.
 function tracker(event){
 	var keyPressed = event.keyCode;
+	console.log("KeyPress invoked");
 	// console.log("keyCode: " + keyPressed);
 	switch(keyPressed){
 
 		// Cool Snake Moves
 		case 37:
 				// console.log("Detected Left");
-				if(coolSnake.direction == "Right"){console.log("Snake Bounce blocked");}
+				if(mySnake.direction == "Right"){console.log("Snake Bounce blocked");}
 				else{
-				coolSnake.direction = "Left";
+				mySnake.direction = "Left";
 				}
 			break;
 		case 38:
 				// console.log("Detected Up");
-				if(coolSnake.direction == "Down"){console.log("Snake Bounce blocked");}
+				if(mySnake.direction == "Down"){console.log("Snake Bounce blocked");}
 				else{
-				coolSnake.direction = "Up";
+				mySnake.direction = "Up";
 				}
 			break;	
 		case 39:
 				// console.log("Detected Right");
-				if(coolSnake.direction == "Left"){console.log("Snake Bounce blocked");}
+				if(mySnake.direction == "Left"){console.log("Snake Bounce blocked");}
 				else{
-				coolSnake.direction = "Right";
+				mySnake.direction = "Right";
 				}
 			break;
 		case 40:
 				// console.log("Detected Down");
-				if(coolSnake.direction == "Up"){console.log("Snake Bounce blocked");}
+				if(mySnake.direction == "Up"){console.log("Snake Bounce blocked");}
 				else{
-				coolSnake.direction = "Down";
+				mySnake.direction = "Down";
 				}
 			break;
-
-		// Anti Snake Moves
-		case 65:
-				// console.log("Detected Left");
-				if(antiSnake.direction == "Right"){console.log("Snake Bounce blocked");}
-				else{
-				antiSnake.direction = "Left";
-				}
-			break;
-		case 87:
-				// console.log("Detected Up");
-				if(antiSnake.direction == "Down"){console.log("Snake Bounce blocked");}
-				else{
-				antiSnake.direction = "Up";
-				}
-			break;	
-		case 68:
-				// console.log("Detected Right");
-				if(antiSnake.direction == "Left"){console.log("Snake Bounce blocked");}
-				else{
-				antiSnake.direction = "Right";
-				}
-			break;
-		case 83:
-				// console.log("Detected Down");
-				if(antiSnake.direction == "Up"){console.log("Snake Bounce blocked");}
-				else{
-				antiSnake.direction = "Down";
-				}
-			break;		
+		console.log(mySnake.direction);
+		// // Anti Snake Moves
+		// case 65:
+		// 		// console.log("Detected Left");
+		// 		if(antiSnake.direction == "Right"){console.log("Snake Bounce blocked");}
+		// 		else{
+		// 		antiSnake.direction = "Left";
+		// 		}
+		// 	break;
+		// case 87:
+		// 		// console.log("Detected Up");
+		// 		if(antiSnake.direction == "Down"){console.log("Snake Bounce blocked");}
+		// 		else{
+		// 		antiSnake.direction = "Up";
+		// 		}
+		// 	break;	
+		// case 68:
+		// 		// console.log("Detected Right");
+		// 		if(antiSnake.direction == "Left"){console.log("Snake Bounce blocked");}
+		// 		else{
+		// 		antiSnake.direction = "Right";
+		// 		}
+		// 	break;
+		// case 83:
+		// 		// console.log("Detected Down");
+		// 		if(antiSnake.direction == "Up"){console.log("Snake Bounce blocked");}
+		// 		else{
+		// 		antiSnake.direction = "Down";
+		// 		}
+		// 	break;		
 	}
 }
 
@@ -240,31 +363,50 @@ function randomColor(){
 	}
 }
 
-// Snake Algorithms
+function snakeFood(position, color){
+	if(host){
+		food = Math.floor(Math.random() * cubeCount);
+		
+		// Prevents new food unit from occupying snake
+		while (isCollision("", food)){
+			console.log("Collision Loop Initiated")
+			console.log("Changing Food");
+			food = Math.floor(Math.random() * cubeCount);
+		}
 
-var game = true;
-var food = 0;
+		var currentColor = randomColor();
+		grid[food].animateIt(currentColor);
+		console.log("PLay Type is: " + playType);
+		if(playType == "onlinePlay"){
 
-function snakeFood(){
-	food = Math.floor(Math.random() * (cubeCount - 1));
-	
-	// Prevents new food unit from occupying snake
-	while (isCollision(food)){
-		console.log("Collision Loop Initiated")
-		console.log("Changing Food");
-		food = Math.floor(Math.random() * (cubeCount - 1));
+			var publishConfig = {
+				channel : opponentChannel,
+				message : {
+					action: "food",
+					hostFoodPosition: food,
+					hostFoodColor: currentColor
+				}
+			};
+			pubnub.publish(publishConfig, function(status, response) {
+				console.log("New Food Published");
+			});
+		}
+	} else {
+		food = position;
+		console.log("Food is at position: " + food);
+		grid[food].animateIt(color);
 	}
-	grid[food].occupied = true;
-	grid[food].animateIt(randomColor());
+		grid[food].occupied = true;
 }
 
-function Snake(color, trailArray){
-	// console.log("Cool Snake is born");
-	this.size = 1;
-	this.color = color
+function Snake(name, color, trailArray, scoreBoard){
+	this.name = name;
+	this.size = 0;
+	this.color = color;
 	this.trailArray = trailArray;
 	this.position = trailArray[1];
 	this.direction = 'Right';
+	this.scoreBoard = scoreBoard;
 	this.moveSnake = function (){
 		if(game){
 			switch(this.direction){
@@ -302,11 +444,13 @@ function Snake(color, trailArray){
 					break;	
 			}
 			// Checks for collision. Ends game if true. Occupies position if false.
-			if (!isCollision(this.position)){
+			if (!isCollision(this.name, this.position)){
 				this.trail();
 			} else {
 				console.log("Game is over");
-				resetGame();
+				console.log("Snake Object", this);
+				clearInterval(gameClock);
+				// resetGame();
 			}
 		}
 	}
@@ -319,7 +463,8 @@ function Snake(color, trailArray){
 			// Food gathered. Skipping pop.
 			this.size++;
 			this.color = grid[food].color;
-			snakeFood();
+			this.scoreBoard.text(this.size);
+			if(host){snakeFood();}
 		} else {
 			grid[this.position].animateIt(this.color);
 			grid[this.position].occupied = true;
@@ -333,17 +478,186 @@ function Snake(color, trailArray){
 }
 
 // Detects collision event with food or self
-function isCollision(position){
+function isCollision(name, position){
 	if (position == food){
-		console.log("Food Gathered");
+		// console.log("Food Gathered");
 		return false;
 	}
 	else if (grid[position].occupied == true){
-		console.log("Is Collision");
-		return true
+		console.log(name + " has collided");
+		console.log("collision at: " + position);
+		return true;
 	} else {
 		return false;
 	}
 }
+
+
+function matchMaking(){
+
+	var newUUID = PubNub.generateUUID();
+	pubnub = new PubNub({
+		uuid: newUUID,
+	    publishKey : 'pub-c-fe32255a-2d44-4996-84db-c7a1e52e7dfc',
+	    subscribeKey : 'sub-c-2a5abf52-e339-11e6-8d2d-02ee2ddab7fe',
+	    presenceTimeout: 10
+	});
+
+	pubnub.addListener({
+	    status: function(statusEvent){
+	        if (statusEvent.category === "PNConnectedCategory") {
+	        	if (firstRun){
+	        		initializeMatch();
+	        	} else {
+	        		if (host){
+						var publishConfig = {
+							channel : opponentChannel,
+							message : {
+								action: "hello"
+							}
+						};
+						pubnub.publish(publishConfig, function(status, response) {
+		        			console.log("Match Confirmed");
+						});
+					}
+	        	}
+	        }
+	    },
+	    message: function(response){
+	    	console.log(response);
+	    	switch(response.channel){
+	    		case 'match_making':
+	    			if(lookingForGame && response.message.potentialHostID == pubnub.getUUID()){
+	    				console.log("Opponent Message recieved");
+	    				opponentName = response.message.guestName;
+	    				opponentChannel = response.message.potentialChannel;
+	    				pubnub.unsubscribeAll();
+						pubnub.subscribe({
+						    channels: [opponentChannel],
+						    withPresence: true
+						});
+
+	    			} else if(!lookingForGame && response.message.potentialHostID == pubnub.getUUID()){
+	    				console.log("I am being addressed, but I am not looking for a game");
+	    			} else {
+	    				console.log("MatchMaking message does not apply to me");
+	    			}
+
+	    			break;
+
+	    		case 'snake_lobby':
+	    			// Do something with lobby
+	    			break;
+
+	    		default:
+	    			// console.log("Message from private channel");
+	    			if (response.message.action == "hello"){
+		    			if(host){
+		    				console.log("I'm the host and the Game is Established");
+		    			} else {
+							console.log("I'm the guest and the Game is Established");
+							opponentChannel = response.channel;
+		    			}
+						startOnlineGame();
+
+		    		} else if(response.message.action == "food" && response.publisher != pubnub.getUUID()){
+		    			console.log("Recieved New Food");
+		    			var hostFoodPosition = response.message.hostFoodPosition;
+		    			var hostFoodColor = response.message.hostFoodColor;
+		    			snakeFood(hostFoodPosition, hostFoodColor);
+
+		    		} else {
+		    			if(response.publisher != pubnub.getUUID()){
+			    			console.log("Opponent Move recieved");
+			    			yourSnake.direction = response.message;
+			    		}
+		    		}
+	    			break;
+	    	}
+	    },
+	    presence: function(presenceEvent){
+	        // console.log(presenceEvent);
+	    }
+	});
+
+	// Join Main Lobby and MatchMaking
+	pubnub.subscribe({
+	    channels: ["snake_lobby", "match_making"],
+	    withPresence: true
+	});
+}
+
+function initializeMatch(){
+	firstRun = false;
+	var newState = {
+	    name: onlinePlayerName,
+	};
+	pubnub.setState({ 
+	    state: newState,
+	    channels: ["snake_lobby"]
+	},
+	function(status, response){
+		console.log("State updated");
+		console.log(response);
+
+		pubnub.hereNow({
+		    channels: ["snake_lobby"],
+		    includeState: true,
+		    includeUUIDs: true
+		},
+		function(status, response){
+			console.log("Here's what is here now");
+		    console.log(response);
+		    var snakeLobby = response.channels.snake_lobby;
+			// If lobby is empty add self to lobby
+			if(snakeLobby.occupancy <= 1 && snakeLobby.occupants[0].uuid == pubnub.getUUID()){
+				console.log("No occupants. Switching to host");
+				host = true;
+				lookingForGame = true;
+				
+			} else {
+				// Potential game found
+				var potentialHostID;
+				var potentialHostName;
+				for(i = 0; i < snakeLobby.occupants.length; i++){
+					if (snakeLobby.occupants[i].uuid != pubnub.getUUID()){
+						console.log("user confirmed");
+						var currentOccupant = snakeLobby.occupants[i];
+						potentialHostID = currentOccupant.uuid;
+						potentialHostName = currentOccupant.state.name;
+						opponentName = currentOccupant.state.name
+						console.log(potentialHostName);
+						break;
+					}
+				}
+
+				console.log("Occupant found. Attempting to handshake");
+				host = false;
+				var potentialChannel = Math.floor((Math.random() * 100) + 1);
+				opponentChannel = potentialChannel;
+				var publishConfig = {
+					channel : "match_making",
+					message : {
+						potentialHostID: potentialHostID,
+						potentialHostName: potentialHostName,
+						potentialChannel: potentialChannel,
+						guestName: onlinePlayerName
+					}
+				};
+				pubnub.publish(publishConfig, function(status, response) {
+					console.log("Publishing Potential Match");
+					pubnub.unsubscribeAll();
+					pubnub.subscribe({
+					    channels: [potentialChannel],
+					    withPresence: true
+					});
+				});
+			}
+		});
+	});
+}
+
 </script>
+</body>
+
 </html>
