@@ -121,12 +121,6 @@ header {
 
 <script type="text/javascript">
 
-// To Do List:
-// Change color behavior
-//
-//
-//
-
 // Global Variables
 var grid = [],
 	playerOneScore = $('#playerOneScore'),
@@ -137,15 +131,12 @@ var grid = [],
 	host = false,
 	lookingForGame = false,
 	firstRun = true,
-	myLastDirection = "Right",
 	game = true,
 	onlinePlayerName,
 	potentialHostName,
 	potentialChannel,
 	opponentName,
 	opponentChannel,
-	coolSnake,
-	antiSnake,
 	mySnake,
 	yourSnake,
 	gameClock,
@@ -191,9 +182,10 @@ function startGame(){
 			mySnake = new Snake("Player 1", "blue", [250, 251, 252], playerOneScore);
 			snakeFood();
 			playerOneScore.css("left", "50%").css("display", "block");
-			keyListener = window.addEventListener('keydown', function(){tracker(event, coolSnake)});
+			keyListener = window.addEventListener('keydown', function(){tracker(event, mySnake)});
 			gameClock = window.setInterval(function(){
-				mySnake.moveSnake();
+				mySnake.commitDirection();
+				mySnake.move();
 			}, gameSpeed);
 			break;
 		case "localMultiplayer":
@@ -204,10 +196,12 @@ function startGame(){
 			snakeFood();
 			playerOneScore.css("display", "block");
 			playerTwoScore.css("display", "block");
-			keyListener = window.addEventListener('keydown', function(){tracker(event, coolSnake, antiSnake)});
+			keyListener = window.addEventListener('keydown', function(){tracker(event, mySnake, yourSnake)});
 			gameClock = window.setInterval(function(){
-				mySnake.moveSnake();
-				yourSnake.moveSnake();
+				mySnake.commitDirection();
+				yourSnake.commitDirection();
+				mySnake.move();
+				yourSnake.move();
 			}, gameSpeed);
 			break;
 		case "onlinePlay":
@@ -231,22 +225,34 @@ function startOnlineGame(){
 		mySnake = new Snake(onlinePlayerName, "blue", [436, 437, 438], playerOneScore);
 		keyListener = window.addEventListener('keydown', function(){tracker(event, yourSnake)});
 	}
+
 	tl.play();
+
 	gameClock = window.setInterval(function(){
-		mySnake.moveSnake();
-		yourSnake.moveSnake();
-		if(mySnake.direction != myLastDirection){
-			myLastDirection = mySnake.direction;
+		var currentTime = new Date();
+		// console.log("Game Tick");
+		// console.log(currentTime.getMinutes() + ":" + currentTime.getSeconds() + ":" + currentTime.getMilliseconds());
+	    mySnake.move();
+		yourSnake.move();
+	}, gameSpeed);
+
+	var syncClock = window.setInterval(function(){
+		// console.log("Information Tick");
+		if(mySnake.actualDirection != mySnake.intendedDirection || yourSnake.actualDirection != yourSnake.intendedDirection){
+			console.log("Change detected. Publishing change");
+			mySnake.commitDirection();
+			yourSnake.commitDirection();
 			var publishConfig = {
-		        channel : opponentChannel,
-		        message : mySnake.direction
-		    };
-	        pubnub.publish(publishConfig, function(status, response) {
-	            // console.log(status, response);
+				channel : opponentChannel,
+				message : mySnake.intendedDirection
+			};
+			pubnub.publish(publishConfig, function(status, response) {
+				// console.log(status, response);
 			});
-	    }
+		}		
 	}, gameSpeed);
 }
+
 
 function resetGame(){
 	game = false;
@@ -291,62 +297,65 @@ function tracker(event){
 		// Cool Snake Moves
 		case 37:
 				// console.log("Detected Left");
-				if(mySnake.direction == "Right"){console.log("Snake Bounce blocked");}
+				if(mySnake.actualDirection == "Right"){console.log("Snake Bounce blocked");}
 				else{
-				mySnake.direction = "Left";
+					mySnake.intendedDirection = "Left";
 				}
 			break;
 		case 38:
 				// console.log("Detected Up");
-				if(mySnake.direction == "Down"){console.log("Snake Bounce blocked");}
+				if(mySnake.actualDirection == "Down"){console.log("Snake Bounce blocked");}
 				else{
-				mySnake.direction = "Up";
+					mySnake.intendedDirection = "Up";
 				}
 			break;	
 		case 39:
 				// console.log("Detected Right");
-				if(mySnake.direction == "Left"){console.log("Snake Bounce blocked");}
+				if(mySnake.actualDirection == "Left"){console.log("Snake Bounce blocked");}
 				else{
-				mySnake.direction = "Right";
+					mySnake.intendedDirection = "Right";
 				}
 			break;
 		case 40:
 				// console.log("Detected Down");
-				if(mySnake.direction == "Up"){console.log("Snake Bounce blocked");}
+				if(mySnake.actualDirection == "Up"){console.log("Snake Bounce blocked");}
 				else{
-				mySnake.direction = "Down";
+					mySnake.intendedDirection = "Down";
 				}
 			break;
-		console.log(mySnake.direction);
-		// // Anti Snake Moves
-		// case 65:
-		// 		// console.log("Detected Left");
-		// 		if(antiSnake.direction == "Right"){console.log("Snake Bounce blocked");}
-		// 		else{
-		// 		antiSnake.direction = "Left";
-		// 		}
-		// 	break;
-		// case 87:
-		// 		// console.log("Detected Up");
-		// 		if(antiSnake.direction == "Down"){console.log("Snake Bounce blocked");}
-		// 		else{
-		// 		antiSnake.direction = "Up";
-		// 		}
-		// 	break;	
-		// case 68:
-		// 		// console.log("Detected Right");
-		// 		if(antiSnake.direction == "Left"){console.log("Snake Bounce blocked");}
-		// 		else{
-		// 		antiSnake.direction = "Right";
-		// 		}
-		// 	break;
-		// case 83:
-		// 		// console.log("Detected Down");
-		// 		if(antiSnake.direction == "Up"){console.log("Snake Bounce blocked");}
-		// 		else{
-		// 		antiSnake.direction = "Down";
-		// 		}
-		// 	break;		
+	};
+
+	if(playType == "localMultiplayer"){
+		switch(keyPressed){
+			case 65:
+					// console.log("Detected Left");
+					if(yourSnake.actualDirection == "Right"){console.log("Snake Bounce blocked");}
+					else{
+					yourSnake.intendedDirection = "Left";
+					}
+				break;
+			case 87:
+					// console.log("Detected Up");
+					if(yourSnake.actualDirection == "Down"){console.log("Snake Bounce blocked");}
+					else{
+					yourSnake.intendedDirection = "Up";
+					}
+				break;	
+			case 68:
+					// console.log("Detected Right");
+					if(yourSnake.actualDirection == "Left"){console.log("Snake Bounce blocked");}
+					else{
+					yourSnake.intendedDirection = "Right";
+					}
+				break;
+			case 83:
+					// console.log("Detected Down");
+					if(yourSnake.actualDirection == "Up"){console.log("Snake Bounce blocked");}
+					else{
+					yourSnake.intendedDirection = "Down";
+					}
+				break;		
+		}
 	}
 }
 
@@ -376,7 +385,6 @@ function snakeFood(position, color){
 
 		var currentColor = randomColor();
 		grid[food].animateIt(currentColor);
-		console.log("PLay Type is: " + playType);
 		if(playType == "onlinePlay"){
 
 			var publishConfig = {
@@ -400,58 +408,60 @@ function snakeFood(position, color){
 }
 
 function Snake(name, color, trailArray, scoreBoard){
-	this.name = name;
-	this.size = 0;
-	this.color = color;
-	this.trailArray = trailArray;
-	this.position = trailArray[1];
-	this.direction = 'Right';
-	this.scoreBoard = scoreBoard;
-	this.moveSnake = function (){
-		if(game){
-			switch(this.direction){
-				case "Left":
-					if (this.position % 31 != 0){
-						this.position -= 1;
-						// console.log("Moving Snake Left");
-					} else {
-						this.position += 30;
-					}
-					break;
-				case "Right":
-					if (this.position % 31 != 0){
-						this.position += 1;
-						// console.log("Moving Snake Right");
-					} else {
-						this.position -= 30;
-					}
-					break;
-				case "Up":
-					if (this.position > 31){
-						this.position += -31;
-						// console.log("Moving Snake Up");
-					} else {
-						this.position += 744;
-					}
-					break;	
-				case "Down":
-					if (this.position < (cubeCount - 33)){
-						this.position += 31;
-						// console.log("Moving Snake Down");
-					} else {
-						this.position += -744;
-					}
-					break;	
-			}
-			// Checks for collision. Ends game if true. Occupies position if false.
-			if (!isCollision(this.name, this.position)){
-				this.trail();
-			} else {
-				console.log("Game is over");
-				console.log("Snake Object", this);
-				clearInterval(gameClock);
-				// resetGame();
-			}
+	this.name = name,
+	this.size = 0,
+	this.color = color,
+	this.trailArray = trailArray,
+	this.position = trailArray[0],
+	this.intendedDirection = 'Right',
+	this.actualDirection = 'Right',
+	this.scoreBoard = scoreBoard,
+	this.commitDirection = function(){
+		this.actualDirection = this.intendedDirection;
+	}
+	this.move = function (){
+		switch(this.actualDirection){
+			case "Left":
+				if (this.position % 31 != 0){
+					this.position -= 1;
+					// console.log("Moving Snake Left");
+				} else {
+					this.position += 30;
+				}
+				break;
+			case "Right":
+				if (this.position % 31 != 0){
+					this.position += 1;
+					// console.log("Moving Snake Right");
+				} else {
+					this.position -= 30;
+				}
+				break;
+			case "Up":
+				if (this.position > 31){
+					this.position += -31;
+					// console.log("Moving Snake Up");
+				} else {
+					this.position += 744;
+				}
+				break;	
+			case "Down":
+				if (this.position < (cubeCount - 33)){
+					this.position += 31;
+					// console.log("Moving Snake Down");
+				} else {
+					this.position += -744;
+				}
+				break;	
+		}
+		// Checks for collision. Ends game if true. Occupies position if false.
+		if (!isCollision(this.name, this.position)){
+			this.trail();
+		} else {
+			console.log("Game is over");
+			console.log("Snake Object", this);
+			clearInterval(gameClock);
+			// resetGame();
 		}
 	}
 	this.trail = function (){
@@ -524,7 +534,7 @@ function matchMaking(){
 	        }
 	    },
 	    message: function(response){
-	    	console.log(response);
+	    	// console.log(response);
 	    	switch(response.channel){
 	    		case 'match_making':
 	    			if(lookingForGame && response.message.potentialHostID == pubnub.getUUID()){
@@ -569,7 +579,8 @@ function matchMaking(){
 		    		} else {
 		    			if(response.publisher != pubnub.getUUID()){
 			    			console.log("Opponent Move recieved");
-			    			yourSnake.direction = response.message;
+			    			console.log(response);
+			    			yourSnake.intendedDirection = response.message;
 			    		}
 		    		}
 	    			break;
@@ -597,8 +608,6 @@ function initializeMatch(){
 	    channels: ["snake_lobby"]
 	},
 	function(status, response){
-		console.log("State updated");
-		console.log(response);
 
 		pubnub.hereNow({
 		    channels: ["snake_lobby"],
@@ -606,7 +615,7 @@ function initializeMatch(){
 		    includeUUIDs: true
 		},
 		function(status, response){
-			console.log("Here's what is here now");
+			console.log("Lobby Status:");
 		    console.log(response);
 		    var snakeLobby = response.channels.snake_lobby;
 			// If lobby is empty add self to lobby
@@ -621,17 +630,16 @@ function initializeMatch(){
 				var potentialHostName;
 				for(i = 0; i < snakeLobby.occupants.length; i++){
 					if (snakeLobby.occupants[i].uuid != pubnub.getUUID()){
-						console.log("user confirmed");
 						var currentOccupant = snakeLobby.occupants[i];
 						potentialHostID = currentOccupant.uuid;
 						potentialHostName = currentOccupant.state.name;
 						opponentName = currentOccupant.state.name
-						console.log(potentialHostName);
+						console.log("Possible Host Found: " + potentialHostName);
 						break;
 					}
 				}
 
-				console.log("Occupant found. Attempting to handshake");
+				console.log("Attempting HandShake");
 				host = false;
 				var potentialChannel = Math.floor((Math.random() * 100) + 1);
 				opponentChannel = potentialChannel;
