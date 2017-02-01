@@ -221,7 +221,7 @@ tl.addPause("game finish");
 
 // Main Function that generates grid
 function gridConstructor(){
-	for (i = 1; i < cubeCount; i++){
+	for (i = 1; i <= cubeCount; i++){
 		$('#grid').append("<div id ='" + i + "'></div>");
 		grid[i] = new Cube(i);
 	}
@@ -353,7 +353,6 @@ function declareWinner(snake){
 	tl.play();
 }
 
-// Defines Cube Object. Requires index numer
 function Cube(cubeNumber){
 	this.cubeID = cubeNumber;
 	this.color = '#000';
@@ -372,7 +371,6 @@ function Cube(cubeNumber){
 	}
 }
 
-// Tracks button presses and decides what to do with it.
 function keyTracker(event){
 	var keyPressed = event.keyCode;
 	// console.log("keyCode: " + keyPressed);
@@ -443,7 +441,6 @@ function keyTracker(event){
 	}
 }
 
-// Produces a random color when called
 function randomColor(){
 	var color = '#'+Math.floor(Math.random()*16777215).toString(16);
 	if (color.length == 7){
@@ -514,7 +511,7 @@ function Snake(name, color, trailArray, scoreBoard){
 				}
 				break;
 			case "Right":
-				if (this.position % 31 != 0){
+				if ((this.position - 1) % 31 != 0){
 					this.position += 1;
 					// console.log("Moving Snake Right");
 				} else {
@@ -530,7 +527,7 @@ function Snake(name, color, trailArray, scoreBoard){
 				}
 				break;	
 			case "Down":
-				if (this.position < (cubeCount - 33)){
+				if (this.position < (cubeCount - 30)){
 					this.position += 31;
 					// console.log("Moving Snake Down");
 				} else {
@@ -581,7 +578,6 @@ function Snake(name, color, trailArray, scoreBoard){
 	}
 }
 
-// Detects collision event with food or self
 function isCollision(name, position){
 	if (position == food){
 		// console.log("Food Gathered");
@@ -595,7 +591,6 @@ function isCollision(name, position){
 		return false;
 	}
 }
-
 
 function beginMatchMaking(){
 
@@ -631,7 +626,6 @@ function beginMatchMaking(){
 	    withPresence: true
 	});
 }
-
 
 function initializeMatch(){
 	firstRun = false;
@@ -754,7 +748,7 @@ function networkMessageHandler(response){
     			setTimeout(function(){
     				clearNotification();
 					startOnlineGame();
-    			}, 1000);
+    			}, gameSpeed);
 
     		} else if(response.message.action == "food" && response.publisher != pubnub.getUUID()){
     			console.log("Recieved New Food");
@@ -764,8 +758,8 @@ function networkMessageHandler(response){
 
     		} else {
     			if(response.publisher != pubnub.getUUID()){
-	    			console.log("Opponent Move recieved");
-	    			console.log(response);
+	    			// console.log("Opponent Move recieved");
+	    			// console.log(response);
 	    			yourSnake.intendedDirection = response.message;
 	    		}
     		}
