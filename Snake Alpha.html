@@ -81,6 +81,11 @@ input{
 }
 
 #title, #subtitle, #playButton {opacity:0;}
+
+#winner{
+	width:100%;
+	text-align:center;
+}
 .wideInteractiveButton{background-color:red;font-size:20px;padding:10px;width:100%;height:50px;transition:all .5s;}
 .wideInteractiveButton:hover{background-color:blue;color:white;}
 .playType{
@@ -298,31 +303,27 @@ function startOnlineGame(){
 		var currentTime = new Date();
 		// console.log("Game Tick");
 		// console.log(currentTime.getMinutes() + ":" + currentTime.getSeconds() + ":" + currentTime.getMilliseconds());
+		mySnake.commitDirection();
+		yourSnake.commitDirection();
 	    mySnake.move();
 		yourSnake.move();
 	}, gameSpeed);
 
-	var syncClock = window.setInterval(function(){
-		// console.log("Information Tick");
-		if(mySnake.actualDirection != mySnake.intendedDirection || yourSnake.actualDirection != yourSnake.intendedDirection){
-			console.log("Change detected. Publishing change");
-			mySnake.commitDirection();
-			yourSnake.commitDirection();
-			var publishConfig = {
-				channel : opponentChannel,
-				message : mySnake.intendedDirection
-			};
-			pubnub.publish(publishConfig, function(status, response) {
-				// console.log(status, response);
-			});
-		}		
-	}, gameSpeed);
-
 	$playerOneScore.css("display", "block");
 	$playerTwoScore.css("display", "block");
-	
 }
 
+function updateOpponent(){
+	var publishConfig = {
+		channel : opponentChannel,
+		message : {
+			action: "move",
+			opponentDirection: mySnake.intendedDirection,
+			opponentSnakeArray: mySnake.trailArray
+		}
+	};
+	pubnub.publish(publishConfig);
+}
 
 function resetGame(){
 	game = false;
@@ -362,12 +363,14 @@ function Cube(cubeNumber){
 	// Function that animates the cube
 	this.animateIt = function (color){
 		this.element.css("background-color", color);
+		this.occupied = true;
 		this.color = color;
 	}	
 
 	// Reverses animation of a particular animation object.
 	this.reverseIt = function (){
 		this.element.removeAttr( 'style' );
+		this.occupied = false;
 	}
 }
 
@@ -382,6 +385,7 @@ function keyTracker(event){
 				if(mySnake.actualDirection == "Right"){console.log("Snake Bounce blocked");}
 				else{
 					mySnake.intendedDirection = "Left";
+					if(playType == "onlinePlay"){updateOpponent();};
 				}
 			break;
 		case 38:
@@ -389,6 +393,7 @@ function keyTracker(event){
 				if(mySnake.actualDirection == "Down"){console.log("Snake Bounce blocked");}
 				else{
 					mySnake.intendedDirection = "Up";
+					if(playType == "onlinePlay"){updateOpponent();};
 				}
 			break;	
 		case 39:
@@ -396,6 +401,7 @@ function keyTracker(event){
 				if(mySnake.actualDirection == "Left"){console.log("Snake Bounce blocked");}
 				else{
 					mySnake.intendedDirection = "Right";
+					if(playType == "onlinePlay"){updateOpponent();};
 				}
 			break;
 		case 40:
@@ -403,6 +409,7 @@ function keyTracker(event){
 				if(mySnake.actualDirection == "Up"){console.log("Snake Bounce blocked");}
 				else{
 					mySnake.intendedDirection = "Down";
+					if(playType == "onlinePlay"){updateOpponent();};
 				}
 			break;
 	};
@@ -466,6 +473,7 @@ function snakeFood(position, color){
 
 		var currentColor = randomColor();
 		grid[food].animateIt(currentColor);
+		grid[food].occupied = false;
 		if(playType == "onlinePlay"){
 
 			var publishConfig = {
@@ -484,8 +492,8 @@ function snakeFood(position, color){
 		food = position;
 		console.log("Food is at position: " + food);
 		grid[food].animateIt(color);
+		grid[food].occupied = false;
 	}
-		grid[food].occupied = true;
 }
 
 function Snake(name, color, trailArray, scoreBoard){
@@ -503,7 +511,7 @@ function Snake(name, color, trailArray, scoreBoard){
 	this.move = function (){
 		switch(this.actualDirection){
 			case "Left":
-				if (this.position % 31 != 0){
+				if ((this.position - 1) % 31 != 0){
 					this.position -= 1;
 					// console.log("Moving Snake Left");
 				} else {
@@ -511,7 +519,7 @@ function Snake(name, color, trailArray, scoreBoard){
 				}
 				break;
 			case "Right":
-				if ((this.position - 1) % 31 != 0){
+				if (this.position % 31 != 0){
 					this.position += 1;
 					// console.log("Moving Snake Right");
 				} else {
@@ -558,13 +566,26 @@ function Snake(name, color, trailArray, scoreBoard){
 			if(host){snakeFood();}
 		} else {
 			grid[this.position].animateIt(this.color);
-			grid[this.position].occupied = true;
 			var popped = this.trailArray.pop();
 			if (popped >= 0){
 				grid[popped].reverseIt();
-				grid[popped].occupied = false;
 			}
 		}
+	}
+	this.lagCorrect = function(snakeArray){
+
+		// Wipe Old Snake
+		this.trailArray.map(function(index){
+			grid[index].reverseIt();
+		});
+
+		this.trailArray = snakeArray;
+		this.position = snakeArray[0];
+
+		// Render New Snake
+		this.trailArray.map(function(index){
+			grid[index].animateIt(this.color);
+		}, this);
 	}
 	this.loserFlash = function (){
 		this.trailArray.map(function(position){
@@ -709,7 +730,7 @@ function confirmMatch(){
 }
 
 function networkMessageHandler(response){
-    // console.log(response);
+    console.log("message");
 	switch(response.channel){
 		case 'match_making':
 			if(lookingForGame && response.message.potentialHostID == pubnub.getUUID()){
@@ -748,7 +769,7 @@ function networkMessageHandler(response){
     			setTimeout(function(){
     				clearNotification();
 					startOnlineGame();
-    			}, gameSpeed);
+    			}, 200);
 
     		} else if(response.message.action == "food" && response.publisher != pubnub.getUUID()){
     			console.log("Recieved New Food");
@@ -756,12 +777,9 @@ function networkMessageHandler(response){
     			var hostFoodColor = response.message.hostFoodColor;
     			snakeFood(hostFoodPosition, hostFoodColor);
 
-    		} else {
-    			if(response.publisher != pubnub.getUUID()){
-	    			// console.log("Opponent Move recieved");
-	    			// console.log(response);
-	    			yourSnake.intendedDirection = response.message;
-	    		}
+    		} else if(response.message.action == "move" && response.publisher != pubnub.getUUID()){
+				yourSnake.intendedDirection = response.message.opponentDirection;
+				yourSnake.lagCorrect(response.message.opponentSnakeArray);
     		}
 			break;
 	}
