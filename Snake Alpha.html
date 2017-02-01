@@ -67,6 +67,19 @@ input{
 	opacity:0;
 }
 
+#notification_message{
+	position:absolute;
+	text-align: center;
+	color:white;
+	top:50px;
+	left:50%;
+	transform: translateX(-50%);
+	background-color: blue;
+	padding:20px;
+	transition:all .5s ease-in;
+	opacity:0;
+}
+
 #title, #subtitle, #playButton {opacity:0;}
 .wideInteractiveButton{background-color:red;font-size:20px;padding:10px;width:100%;height:50px;transition:all .5s;}
 .wideInteractiveButton:hover{background-color:blue;color:white;}
@@ -117,7 +130,9 @@ input{
 </head>
 
 <body onLoad="gridConstructor()">
-<!--<header>Snake By Sage</header>-->
+
+<p id="notification_message"></p>
+
 <div id="title_screen" class="centerUI"> 
 <h1 id="title">Snake</h1>
 <h2 id="subtitle">Coded By: Sage Pacheco</h2>
@@ -132,27 +147,29 @@ input{
 <h1 id="winner"></h1>
 <h2 id="gameSummary"></h2>
 <button class="wideInteractiveButton" id="finishButton" onClick="tl.reverse('game start')">Finish</button>
-
 </div>
+
 <p id="playerOneScore" class="score">
 0
 </p>
 <p id="playerTwoScore" class="score">
 0
 </p>
-<div id="grid"> </div>
+
+<div id="grid"></div>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.19.1/TimelineMax.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.19.1/TweenMax.min.js"></script>
-<script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.4.0.min.js"></script>
+<script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.4.2.min.js"></script>
 
 <script type="text/javascript">
 
 // Global Variables
 var grid = [],
-	playerOneScore = $('#playerOneScore'),
-	playerTwoScore = $('#playerTwoScore'),
+	$playerOneScore = $('#playerOneScore'),
+	$playerTwoScore = $('#playerTwoScore'),
+	$notificationMessage = $('#notification_message'),
 	playType = "single",
 	cubeCount = 775,
 	gameSpeed = 80, //80
@@ -210,6 +227,19 @@ function gridConstructor(){
 	}
 }
 
+function notification(message){
+	$notificationMessage
+	.text(message)
+	// .css("display", "block")
+	.css("opacity", "1");
+};
+
+function clearNotification(){
+	$notificationMessage
+	.css("opacity", "0")
+	// .css("display", "none");
+}
+
 function startGame(){
 	myPlayerName = $('#playerName').val();
 	if (myPlayerName == ""){myPlayerName = "Player 1"};
@@ -218,9 +248,9 @@ function startGame(){
 		case "single":
 			host = true;
 			tl.play();
-			mySnake = new Snake(myPlayerName, "blue", [250, 251, 252], playerOneScore);
+			mySnake = new Snake(myPlayerName, "blue", [250, 251, 252], $playerOneScore);
 			snakeFood();
-			playerOneScore.css("left", "50%").css("display", "block");
+			$playerOneScore.css("left", "50%").css("display", "block");
 			keyListener = window.addEventListener('keydown', function(){keyTracker(event, mySnake)});
 			gameClock = window.setInterval(function(){
 				mySnake.commitDirection();
@@ -230,11 +260,11 @@ function startGame(){
 		case "localMultiplayer":
 			host = true;
 			tl.play();
-			mySnake = new Snake(myPlayerName, "blue", [250, 251, 252], playerOneScore);
-			yourSnake = new Snake("Player 2", "red", [436, 437, 438], playerTwoScore);
+			mySnake = new Snake(myPlayerName, "blue", [250, 251, 252], $playerOneScore);
+			yourSnake = new Snake("Player 2", "red", [436, 437, 438], $playerTwoScore);
 			snakeFood();
-			playerOneScore.css("display", "block");
-			playerTwoScore.css("display", "block");
+			$playerOneScore.css("display", "block");
+			$playerTwoScore.css("display", "block");
 			keyListener = window.addEventListener('keydown', function(){keyTracker(event, mySnake, yourSnake)});
 			gameClock = window.setInterval(function(){
 				mySnake.commitDirection();
@@ -251,16 +281,14 @@ function startGame(){
 
 function startOnlineGame(){
 
-	playerOneScore.css("display", "block");
-	playerTwoScore.css("display", "block");
 	if(host){
-		mySnake = new Snake(myPlayerName, "blue", [250, 251, 252], playerOneScore);
-		yourSnake = new Snake(opponentName, "red", [436, 437, 438], playerTwoScore);
+		mySnake = new Snake(myPlayerName, "blue", [250, 251, 252], $playerOneScore);
+		yourSnake = new Snake(opponentName, "red", [436, 437, 438], $playerTwoScore);
 		snakeFood();
 		keyListener = window.addEventListener('keydown', function(){keyTracker(event, mySnake)});
 	} else {
-		yourSnake = new Snake(opponentName, "red", [250, 251, 252], playerTwoScore);
-		mySnake = new Snake(myPlayerName, "blue", [436, 437, 438], playerOneScore);
+		yourSnake = new Snake(opponentName, "red", [250, 251, 252], $playerTwoScore);
+		mySnake = new Snake(myPlayerName, "blue", [436, 437, 438], $playerOneScore);
 		keyListener = window.addEventListener('keydown', function(){keyTracker(event, yourSnake)});
 	}
 
@@ -289,6 +317,10 @@ function startOnlineGame(){
 			});
 		}		
 	}, gameSpeed);
+
+	$playerOneScore.css("display", "block");
+	$playerTwoScore.css("display", "block");
+	
 }
 
 
@@ -298,8 +330,8 @@ function resetGame(){
 		obj.occupied = false;
 		obj.reverseIt();
 	});
-	playerOneScore.text(0).css("left", "45%").css("display", "none");
-	playerTwoScore.text(0).css("display", "none");
+	$playerOneScore.text(0).css("left", "45%").css("display", "none");
+	$playerTwoScore.text(0).css("display", "none");
 }
 
 function declareWinner(snake){
@@ -581,7 +613,7 @@ function beginMatchMaking(){
 	        	if (firstRun){
 	        		initializeMatch();
 	        	} else if (host){
-					confirmMatch();	
+					confirmMatch();
 				}
 	        }
 	    },
@@ -623,6 +655,7 @@ function initializeMatch(){
 		    var snakeLobby = response.channels.snake_lobby;
 			// If lobby is empty add self to lobby
 			if(snakeLobby.occupancy <= 1 && snakeLobby.occupants[0].uuid == pubnub.getUUID()){
+				notification("Waiting for an opponent");
 				console.log("No occupants. Switching to host");
 				host = true;
 				lookingForGame = true;
@@ -637,6 +670,7 @@ function initializeMatch(){
 						potentialHostID = currentOccupant.uuid;
 						potentialHostName = currentOccupant.state.name;
 						opponentName = currentOccupant.state.name
+						notification("Possible Opponent Found: " + potentialHostName);
 						console.log("Possible Host Found: " + potentialHostName);
 						break;
 					}
@@ -687,6 +721,7 @@ function networkMessageHandler(response){
 			if(lookingForGame && response.message.potentialHostID == pubnub.getUUID()){
 				console.log("Opponent Message recieved");
 				opponentName = response.message.guestName;
+				notification("Found Opponent: " + opponentName);
 				opponentChannel = response.message.potentialChannel;
 				pubnub.unsubscribeAll();
 				pubnub.subscribe({
@@ -715,7 +750,11 @@ function networkMessageHandler(response){
 					console.log("I'm the guest and the Game is Established");
 					opponentChannel = response.channel;
     			}
-				startOnlineGame();
+    			notification("Starting Match with " + opponentName);
+    			setTimeout(function(){
+    				clearNotification();
+					startOnlineGame();
+    			}, 1000);
 
     		} else if(response.message.action == "food" && response.publisher != pubnub.getUUID()){
     			console.log("Recieved New Food");
