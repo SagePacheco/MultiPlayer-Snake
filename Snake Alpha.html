@@ -28,7 +28,7 @@ header {
 }
 
 input{
-	margin-top:10px;
+	margin-top:25px;
 	text-align: center;
 	font-size:50px;
 }
@@ -50,7 +50,7 @@ input{
 }
 
 .centerUI h1{
-	font-size:100px;
+	font-size:125px;
 }
 
 .centerUI h2{
@@ -81,6 +81,14 @@ input{
 }
 
 #title, #subtitle, #playButton {opacity:0;}
+.playType{opacity:0;}
+
+#playerName{opacity:0;}
+
+#title{
+	font-family: 'Mrs Sheppards', cursive;
+	text-shadow: 1px 1px 1px red;
+}
 
 #winner{
 	width:100%;
@@ -139,7 +147,7 @@ input{
 
 <div id="title_screen" class="centerUI"> 
 <h1 id="title">Snake</h1>
-<h2 id="subtitle">Coded By: Sage Pacheco</h2>
+<h2 id="subtitle">Adaptation By: Sage Pacheco</h2>
 <button id="playButton" class="wideInteractiveButton" onClick="startGame()" type="button">Play Game</button>
 <button data-game="single" class="playType active">Single-Player</button>
 <button data-game="localMultiplayer" class="playType">Local Multi-Player</button>
@@ -162,7 +170,7 @@ input{
 <p id="notification_message"></p>
 
 <div id="grid"></div>
-
+<link href="https://fonts.googleapis.com/css?family=Mrs+Sheppards" rel="stylesheet">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.19.1/TimelineMax.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.19.1/TweenMax.min.js"></script>
@@ -203,26 +211,30 @@ $('.playType').click(function(){
 });
 
 // Game Timeline
-var titleScreen = $('#title_screen'),
-	title = $('#title'),
-	subtitle = $('#subtitle'),
-	playButton = $('#playButton'),
-	finishScreen = $('#final_score'),
-	winnerTitle = $('#winner'),
-	winnerSubTitle = $('#gameSummary'),
-	finishButton = $('#finishButton'),
+var $titleScreen = $('#title_screen'),
+	$title = $('#title'),
+	$subtitle = $('#subtitle'),
+	$playButton = $('#playButton'),
+	$playType = $('.playType'),
+	$playerName = $('#playerName'),
+	$finishScreen = $('#final_score'),
+	$winnerTitle = $('#winner'),
+	$winnerSubTitle = $('#gameSummary'),
+	$finishButton = $('#finishButton'),
 	tl = new TimelineMax();
-tl.add( TweenLite.to(titleScreen, 0.5, {opacity:1, display:'flex'}, "intro") );
-tl.add( TweenLite.to(title, 0.25, {opacity:1}, "intro") );
-tl.add( TweenLite.to(subtitle, 0.25, {opacity:1}, "intro") );
-tl.add( TweenLite.to(playButton, 0.25, {opacity:1}, "intro") );
+tl.add( TweenLite.to($titleScreen, 0.5, {opacity:1, display:'flex'}, "intro") );
+tl.add( TweenLite.to($title, 0.25, {opacity:1}, "intro") );
+tl.add( TweenLite.to($subtitle, 0.25, {opacity:1}, "intro") );
+tl.add( TweenLite.to($playButton, 0.25, {opacity:1}, "intro") );
+tl.add( TweenLite.to($playType, 0.25, {opacity:1}, "intro") );
+tl.add( TweenLite.to($playerName, 0.25, {opacity:1}, "intro") );
 tl.addPause("intro");
-tl.add( TweenLite.to(titleScreen, 0.5, {opacity:0, display:'none'}, "game start") );
+tl.add( TweenLite.to($titleScreen, 0.5, {opacity:0, display:'none'}, "game start") );
 tl.addPause("game start");
-tl.add( TweenLite.to(finishScreen, 0.5, {opacity:1, display:'flex'}, "game finish") );
-tl.add( TweenLite.to(winnerTitle, 0.25, {opacity:1}, "game finish") );
-tl.add( TweenLite.to(winnerSubTitle, 0.25, {opacity:1}, "game finish") );
-tl.add( TweenLite.to(finishButton, 0.25, {opacity:1}, "game finish") );
+tl.add( TweenLite.to($finishScreen, 0.5, {opacity:1, display:'flex'}, "game finish") );
+tl.add( TweenLite.to($winnerTitle, 0.25, {opacity:1}, "game finish") );
+tl.add( TweenLite.to($winnerSubTitle, 0.25, {opacity:1}, "game finish") );
+tl.add( TweenLite.to($finishButton, 0.25, {opacity:1}, "game finish") );
 tl.addPause("game finish");
 
 // Main Function that generates grid
@@ -246,7 +258,7 @@ function clearNotification(){
 
 function startGame(){
 	myPlayerName = $('#playerName').val();
-	if (myPlayerName === ""){myPlayerName = "Player 1";}
+	myPlayerName = myPlayerName === "" ? "Player 1" : myPlayerName;
 	switch(playType){
 		case "single":
 			host = true;
@@ -261,8 +273,12 @@ function startGame(){
 			}, gameSpeed);
 			break;
 		case "localMultiplayer":
+			notification("Player 1: Directional Pad | Player 2: WASD");
 			host = true;
 			tl.play();
+			setTimeout(function(){
+				clearNotification();
+			},5000);
 			mySnake = new Snake(myPlayerName, "blue", [250, 251, 252], $playerOneScore);
 			yourSnake = new Snake("Player 2", "red", [436, 437, 438], $playerTwoScore);
 			snakeFood();
@@ -324,7 +340,12 @@ function updateOpponent(){
 
 function resetGame(){
 
+	if(playType === "onlinePlay"){
+		pubnub.unsubscribeAll();
+	}
+
 	// Resetting Global Variables
+	pubnub = undefined,
 	host = false,
 	lookingForGame = false,
 	firstRun = true,
@@ -337,8 +358,7 @@ function resetGame(){
 	yourSnake = undefined,
 	gameClock = undefined,
 	keyListener = undefined,
-	food = undefined,
-	pubnub = undefined;
+	food = undefined;
 
 	grid.map(function(obj){
 		obj.occupied = false;
