@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Game Alpha</title>
+<link href="http://fonts.googleapis.com/css?family=Oswald:400,700" rel="stylesheet" type="text/css">
+<link href="css/styles.min.css" rel="stylesheet" type="text/css">
+
+</head>
+
+<body onLoad="gridConstructor()">
+
+
+<div id="title_screen" class="centerUI"> 
+<h1 id="title">Snake</h1>
+<h2 id="subtitle">Adaptation By: Sage Pacheco</h2>
+<button id="playButton" class="wideInteractiveButton" onClick="startGame()" type="button">Play Game</button>
+<button data-game="single" class="playType active">Single-Player</button>
+<button data-game="localMultiplayer" class="playType">Local Multi-Player</button>
+<button data-game="onlinePlay" class="playType">Online Multi-Player</button>
+<input id="playerName" placeholder="Enter Player Name" maxlength="15">
+</div>
+
+<div id="final_score" class="centerUI">
+<h1 id="winner"></h1>
+<h2 id="gameSummary"></h2>
+<button class="wideInteractiveButton" id="finishButton" onClick="tl.reverse('game start')">Finish</button>
+</div>
+
+<p id="playerOneScore" class="score">
+0
+</p>
+<p id="playerTwoScore" class="score">
+0
+</p>
+<p id="notification_message"></p>
+
+<div id="grid"></div>
+<link href="https://fonts.googleapis.com/css?family=Mrs+Sheppards" rel="stylesheet">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.19.1/TimelineMax.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.19.1/TweenMax.min.js"></script>
+<script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.4.2.min.js"></script>
+<script src="js/gameLogic.min.js"></script>
+
+</body>
+
+</html>
